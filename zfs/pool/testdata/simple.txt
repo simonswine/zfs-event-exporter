@@ -1,0 +1,8 @@
+ pool: pool
+ state: ONLINE
+  scan: scrub repaired 0B in 02:49:18 with 0 errors on Sun Jan 15 12:43:01 2023
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	pool        ONLINE       0     0     0
+	  /dev/sda  ONLINE       0     0     0

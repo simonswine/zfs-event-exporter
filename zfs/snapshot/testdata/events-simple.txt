@@ -1,0 +1,306 @@
+Nov 23 2023 03:45:50.763089998	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0/%recv"
+        history_internal_str = "(bptree, mintxg=18584865)"
+        history_internal_name = "destroy"
+        history_dsid = 0x2ce7f
+        history_txg = 0x11b9529
+        history_time = 0x655ecaee
+        time = 0x655ecaee 0x2d7bd44e 
+        eid = 0xfa26
+
+Nov 23 2023 03:45:51.005089471	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0@zrepl_20231122_230701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node temp=0 refs=1"
+        history_internal_name = "hold"
+        history_dsid = 0x2cd76
+        history_txg = 0x11b952a
+        history_time = 0x655ecaef
+        time = 0x655ecaef 0x4da8bf 
+        eid = 0xfa27
+
+Nov 23 2023 03:45:51.210089024	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0@zrepl_20231122_225701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node refs=0"
+        history_internal_name = "release"
+        history_dsid = 0x2cdc1
+        history_txg = 0x11b952b
+        history_time = 0x655ecaef
+        time = 0x655ecaef 0xc85b440 
+        eid = 0xfa28
+
+Nov 23 2023 03:45:52.374086487	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var/%recv"
+        history_internal_str = " "
+        history_internal_name = "receive"
+        history_dsid = 0x2cd7d
+        history_txg = 0x11b952c
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x164c1b57 
+        eid = 0xfa29
+
+Nov 23 2023 03:45:52.591086014	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var/%recv"
+        history_internal_str = "snap=zrepl_20231122_231701_000"
+        history_internal_name = "finish receiving"
+        history_dsid = 0x2cd7d
+        history_txg = 0x11b952d
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x233b41be 
+        eid = 0xfa2a
+
+Nov 23 2023 03:45:52.592086012	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var/%recv"
+        history_internal_str = "parent=var"
+        history_internal_name = "clone swap"
+        history_dsid = 0x2cd7d
+        history_txg = 0x11b952d
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x234a83fc 
+        eid = 0xfa2b
+
+Nov 23 2023 03:45:52.593086010	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var@zrepl_20231122_231701_000"
+        history_internal_str = " "
+        history_internal_name = "snapshot"
+        history_dsid = 0x2cc5c
+        history_txg = 0x11b952d
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x2359c63a 
+        eid = 0xfa2c
+
+Nov 23 2023 03:45:52.596086004	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var/%recv"
+        history_internal_str = "(bptree, mintxg=18584869)"
+        history_internal_name = "destroy"
+        history_dsid = 0x2cd7d
+        history_txg = 0x11b952d
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x23878cf4 
+        eid = 0xfa2d
+
+Nov 23 2023 03:45:52.819085518	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var@zrepl_20231122_231701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node temp=0 refs=1"
+        history_internal_name = "hold"
+        history_dsid = 0x2cc5c
+        history_txg = 0x11b952e
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x30d240ce 
+        eid = 0xfa2e
+
+Nov 23 2023 03:45:52.999085125	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var@zrepl_20231122_230701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node refs=0"
+        history_internal_name = "release"
+        history_dsid = 0x2cdd1
+        history_txg = 0x11b952f
+        history_time = 0x655ecaf0
+        time = 0x655ecaf0 0x3b8cd445 
+        eid = 0xfa2f
+
+Nov 23 2023 03:45:54.156082603	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0/%recv"
+        history_internal_str = " "
+        history_internal_name = "receive"
+        history_dsid = 0x2cddc
+        history_txg = 0x11b9530
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x94da1ab 
+        eid = 0xfa30
+
+Nov 23 2023 03:45:54.480081897	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0/%recv"
+        history_internal_str = "snap=zrepl_20231122_231701_000"
+        history_internal_name = "finish receiving"
+        history_dsid = 0x2cddc
+        history_txg = 0x11b9531
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x1c9d77e9 
+        eid = 0xfa31
+
+Nov 23 2023 03:45:54.481081895	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0/%recv"
+        history_internal_str = "parent=pvc-b46c973b-33f0-471e-a11a-54ec315b46c0"
+        history_internal_name = "clone swap"
+        history_dsid = 0x2cddc
+        history_txg = 0x11b9531
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x1cacba27 
+        eid = 0xfa32
+
+Nov 23 2023 03:45:54.482081893	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0@zrepl_20231122_231701_000"
+        history_internal_str = " "
+        history_internal_name = "snapshot"
+        history_dsid = 0x2cc60
+        history_txg = 0x11b9531
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x1cbbfc65 
+        eid = 0xfa33
+
+Nov 23 2023 03:45:54.486081884	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0/%recv"
+        history_internal_str = "(bptree, mintxg=18584873)"
+        history_internal_name = "destroy"
+        history_dsid = 0x2cddc
+        history_txg = 0x11b9531
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x1cf9055c 
+        eid = 0xfa34
+
+Nov 23 2023 03:45:54.801081197	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0@zrepl_20231122_231701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node temp=0 refs=1"
+        history_internal_name = "hold"
+        history_dsid = 0x2cc60
+        history_txg = 0x11b9532
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x2fbf876d 
+        eid = 0xfa35
+
+Nov 23 2023 03:45:54.976080816	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/data0@zrepl_20231122_230701_000"
+        history_internal_str = "tag=zrepl_last_received_J_pull-node refs=0"
+        history_internal_name = "release"
+        history_dsid = 0x2cd76
+        history_txg = 0x11b9533
+        history_time = 0x655ecaf2
+        time = 0x655ecaf2 0x3a2dcfb0 
+        eid = 0xfa36
+
+Nov 23 2023 03:47:36.814857739	sysevent.fs.zfs.history_event
+        version = 0x0
+        class = "sysevent.fs.zfs.history_event"
+        pool = "pool-hdd"
+        pool_guid = 0x824837db6539792e
+        pool_state = 0x0
+        pool_context = 0x0
+        history_hostname = "pool"
+        history_dsname = "pool-hdd/backup/var@zrepl_20231120_095659_000"
+        history_internal_str = " "
+        history_internal_name = "destroy"
+        history_dsid = 0x293dc
+        history_txg = 0x11b9605
+        history_time = 0x655ecb58
+        time = 0x655ecb58 0x3091be0b 
+        eid = 0xfc25
+

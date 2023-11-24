@@ -1,0 +1,8 @@
+ pool: pool
+ state: FAULTED
+  scan: scrub repaired 0B in 02:49:18 with 0 errors on Sun Jan 15 12:43:01 2023
+config:
+
+	NAME        STATE      READ WRITE CKSUM
+	pool        FAULTED       2     4     6
+	  /dev/sda  OFFLINE       1     2     3
