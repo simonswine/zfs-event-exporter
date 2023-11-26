@@ -1,4 +1,4 @@
-package pool
+package snapshot
 
 import (
 	"bufio"
@@ -14,10 +14,24 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 )
 
-func cmdListSnapshots(ctx context.Context) ([]byte, error) {
-	return exec.Command("zfs", "list", "-H", "-p", "-t", "snapshot", "-o", "name,creation,used").Output()
+func cmdListSnapshots(ctx context.Context, args ...string) ([]byte, error) {
+	args = append([]string{"list", "-H", "-p", "-t", "snapshot", "-o", "name,creation,used"}, args...)
+	return exec.Command("zfs", args...).Output()
+}
+
+func cmdZpoolEvents(ctx context.Context, out io.Writer) error {
+	cmd := exec.CommandContext(ctx,
+		"zpool",
+		"events",
+		"-f",
+		"-H",
+		"-v",
+	)
+	cmd.Stdout = out
+	return cmd.Start()
 }
 
 type snapshotState struct {
@@ -27,78 +41,98 @@ type snapshotState struct {
 }
 
 type snapshotCollector struct {
-	lck sync.Mutex
+	lck    sync.Mutex
+	logger zerolog.Logger
 
-	datasets map[string][]snapshotState
+	datasets      snapshotsState
+	listSnapshots func(context.Context, ...string) ([]byte, error)
 
 	metricCount        *prometheus.GaugeVec
 	metricLastUnixtime *prometheus.GaugeVec
 	metricDiskUsed     *prometheus.GaugeVec
 }
 
-func NewCollector(ctx context.Context) (*snapshotCollector, error) {
-	return newCollector(ctx, cmdListSnapshots)
+func NewCollector(ctx context.Context, logger zerolog.Logger) (*snapshotCollector, error) {
+	var (
+		eventCh                  = make(chan *zpoolEvent)
+		eventReader, eventWriter = io.Pipe()
+	)
+
+	if err := cmdZpoolEvents(ctx, eventWriter); err != nil {
+		return nil, fmt.Errorf("failed to start zpool events: %w", err)
+	}
+
+	go func() {
+		if err := parseZpoolEvents(eventReader, eventCh); err != nil {
+			logger.Error().Err(err).Msg("failed to parse zpool events")
+		}
+	}()
+
+	return newCollector(ctx, logger, cmdListSnapshots, eventCh)
+
 }
 
-func parseSnapshots(r io.Reader) (map[string][]snapshotState, error) {
-	datasets := make(map[string][]snapshotState)
+type snapshotsState map[string][]snapshotState
 
+func (s snapshotsState) parse(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
 		if len(fields) != 3 {
-			return nil, fmt.Errorf("invalid line: %q", line)
+			return fmt.Errorf("invalid line: %q", line)
 		}
 
 		idx := strings.LastIndex(fields[0], "@")
 		if idx == -1 {
-			return nil, fmt.Errorf("invalid snapshot name: %q", fields[0])
+			return fmt.Errorf("invalid snapshot name: %q", fields[0])
 		}
 
 		tsUnix, err := strconv.ParseInt(fields[1], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid timestamp: %q", fields[1])
+			return fmt.Errorf("invalid timestamp: %q", fields[1])
 		}
 		ts := time.Unix(tsUnix, 0)
 
 		used, err := strconv.ParseUint(fields[2], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid used bytes: %q", fields[2])
+			return fmt.Errorf("invalid used bytes: %q", fields[2])
 		}
 
 		dataset := fields[0][:idx]
 
-		datasets[dataset] = append(datasets[dataset], snapshotState{
+		s[dataset] = append(s[dataset], snapshotState{
 			name: fields[0][idx+1:],
 			ts:   ts,
 			used: used,
 		})
 	}
 
-	for _, snapshots := range datasets {
+	for _, snapshots := range s {
 		sort.Slice(snapshots, func(i, j int) bool {
 			return snapshots[i].ts.Before(snapshots[j].ts)
 		})
 	}
 
-	return datasets, nil
+	return nil
 }
 
-func newCollector(ctx context.Context, listSnapshots func(context.Context) ([]byte, error)) (*snapshotCollector, error) {
-
+func newCollector(ctx context.Context, logger zerolog.Logger, listSnapshots func(context.Context, ...string) ([]byte, error), eventCh chan *zpoolEvent) (*snapshotCollector, error) {
 	data, err := listSnapshots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
 	}
 
-	datasets, err := parseSnapshots(bytes.NewReader(data))
-	if err != nil {
+	datasets := make(snapshotsState)
+
+	if err := datasets.parse(bytes.NewReader(data)); err != nil {
 		return nil, fmt.Errorf("failed to parse snapshots: %w", err)
 	}
 
-	return &snapshotCollector{
-		datasets: datasets,
+	c := &snapshotCollector{
+		logger:        logger.With().Str("collector", "snapshot").Logger(),
+		datasets:      datasets,
+		listSnapshots: listSnapshots,
 		metricCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "zfs",
 			Subsystem: "snapshot",
@@ -117,7 +151,80 @@ func newCollector(ctx context.Context, listSnapshots func(context.Context) ([]by
 			Name:      "last_unixtime",
 			Help:      "Time of last ZFS snapshot",
 		}, []string{"dataset"}),
-	}, nil
+	}
+
+	go func() {
+		err := c.eventLoop(ctx, eventCh)
+		if err != nil {
+			c.logger.Error().Err(err).Msg("snapshot event loop failed")
+		}
+	}()
+
+	return c, nil
+}
+
+func (c *snapshotCollector) removeSnapshot(datasetName string, snapshotName string) {
+	c.lck.Lock()
+	defer c.lck.Unlock()
+
+	snapshots, ok := c.datasets[datasetName]
+	if !ok {
+		return
+	}
+
+	for i, snap := range snapshots {
+		if snap.name == snapshotName {
+			// remove snapshot
+			c.datasets[datasetName] = append(c.datasets[datasetName][:i], c.datasets[datasetName][i+1:]...)
+		}
+	}
+}
+
+func (c *snapshotCollector) addSnapshot(datasetName string, snapshotName string) error {
+	data, err := c.listSnapshots(context.Background(), datasetName)
+	if err != nil {
+		return err
+	}
+
+	c.lck.Lock()
+	defer c.lck.Unlock()
+
+	return c.datasets.parse(bytes.NewReader(data))
+}
+
+func (c *snapshotCollector) eventLoop(ctx context.Context, eventCh chan *zpoolEvent) error {
+	if eventCh == nil {
+		return nil
+	}
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		case event := <-eventCh:
+			if event.HistoryInternalName != "snapshot" && event.HistoryInternalName != "destroy" {
+				continue
+			}
+
+			idx := strings.LastIndex(event.HistoryDSName, "@")
+			if idx == -1 {
+				continue
+			}
+
+			dataset := event.HistoryDSName[:idx]
+			snapshot := event.HistoryDSName[idx+1:]
+
+			if event.HistoryInternalName == "destroy" {
+				c.removeSnapshot(dataset, snapshot)
+				continue
+			}
+
+			if err := c.addSnapshot(dataset, snapshot); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (c *snapshotCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -184,14 +291,12 @@ func parseZpoolEvents(r io.Reader, ch chan *zpoolEvent) error {
 		lineno++
 		line := scanner.Text()
 		if line == "" {
-			fmt.Println("event end")
 			ch <- event
 			event = new(zpoolEvent)
 			lineno = -1
 			continue
 		}
 		if lineno == 0 {
-			fmt.Println("event start", line)
 			continue
 		}
 		// find the separator between the key and the value
@@ -224,7 +329,7 @@ func parseZpoolEvents(r io.Reader, ch chan *zpoolEvent) error {
 		case "history_dsname":
 			event.HistoryDSName = trimDoubleQuotes(value)
 		default:
-			fmt.Printf("unused key=%s value=%s\n", key, value)
+			break
 		}
 	}
 	if scanner.Err() != nil {

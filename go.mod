@@ -1,9 +1,8 @@
-module github.com/simonswine/zfs-event-listener
+module github.com/simonswine/zfs-event-exporter
 
 go 1.20
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/zerolog v1.31.0
 	github.com/stretchr/testify v1.4.0
@@ -11,6 +10,7 @@ require (
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
@@ -19,7 +19,6 @@ require (
 )
 
 require (
-	git.dolansoft.org/lorenz/go-zfs v0.0.0-20211205151927-3df88f338885
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -30,5 +29,3 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
-
-replace git.dolansoft.org/lorenz/go-zfs => github.com/lorenz/go-zfs v0.0.0-20230225101216-f5e946970e2d

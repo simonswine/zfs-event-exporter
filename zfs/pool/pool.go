@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -45,6 +46,8 @@ func setStatus(m *prometheus.GaugeVec, labelValues ...string) {
 }
 
 type poolCollector struct {
+	logger zerolog.Logger
+
 	metricStatus     *prometheus.GaugeVec
 	metricErrors     *prometheus.CounterVec
 	metricDiskStatus *prometheus.GaugeVec
@@ -53,8 +56,10 @@ type poolCollector struct {
 	getStatus func() ([]byte, error)
 }
 
-func NewCollector() *poolCollector {
+func NewCollector(logger zerolog.Logger) *poolCollector {
 	return &poolCollector{
+		logger: logger.With().Str("collector", "pool").Logger(),
+
 		getStatus: zpoolStatusCmd,
 
 		metricStatus: prometheus.NewGaugeVec(
@@ -86,12 +91,6 @@ func NewCollector() *poolCollector {
 			[]string{"disk", "pool", "type"},
 		),
 	}
-}
-
-type zpoolDisk struct {
-	Path   string
-	Health string
-	Errors *zpoolErrors
 }
 
 type zpoolErrors struct {
@@ -306,7 +305,4 @@ func (pc *poolCollector) Describe(ch chan<- *prometheus.Desc) {
 	pc.metricErrors.Describe(ch)
 	pc.metricDiskStatus.Describe(ch)
 	pc.metricDiskErrors.Describe(ch)
-}
-
-func main() {
 }

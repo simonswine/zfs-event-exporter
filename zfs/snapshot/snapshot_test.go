@@ -1,4 +1,4 @@
-package pool
+package snapshot
 
 import (
 	"bytes"
@@ -8,21 +8,50 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPoolMetrics(t *testing.T) {
-	for _, tc := range []struct {
-		name string
+func retryMax(t *testing.T, max int, f func() error) error {
+	var err error
+	for i := 0; i < max; i++ {
+		err = f()
+		if err == nil {
+			break
+		}
+		if max == 0 {
+			return err
+		}
+		max--
+		time.Sleep(50 * time.Millisecond)
+	}
+	return nil
+}
 
-		expectedMetrics string
-	}{
-		{
-			name: "simple",
-			expectedMetrics: `
+func TestPoolMetrics(t *testing.T) {
+	var (
+		callback func(ctx context.Context, args ...string) ([]byte, error)
+		reg      = prometheus.NewPedanticRegistry()
+		eventCh  = make(chan *zpoolEvent)
+	)
+
+	t.Run("static snapshots after start up", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join("testdata", "snapshots-simple.txt"))
+		require.NoError(t, err)
+		callback = func(context.Context, ...string) ([]byte, error) {
+			return data, nil
+		}
+
+		ctx := context.Background()
+		c, err := newCollector(ctx, zerolog.Nop(), func(ctx context.Context, args ...string) ([]byte, error) { return callback(ctx, args...) }, eventCh)
+		require.NoError(t, err)
+		reg.MustRegister(c)
+
+		expectedMetrics := `
 # HELP zfs_snapshot_count Count of existing ZFS snapshots.
 # TYPE zfs_snapshot_count gauge
 zfs_snapshot_count{dataset="pool-hdd/backup/pull/node-a/data"} 2
@@ -35,25 +64,73 @@ zfs_snapshot_disk_used{dataset="pool-nvme/data"} 3571712
 # TYPE zfs_snapshot_last_unixtime gauge
 zfs_snapshot_last_unixtime{dataset="pool-hdd/backup/pull/node-a/data"} 1667320886
 zfs_snapshot_last_unixtime{dataset="pool-nvme/data"} 1602276642
-			`,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			data, err := os.ReadFile(filepath.Join("testdata", "snapshots-"+tc.name+".txt"))
-			require.NoError(t, err)
+			`
+		require.NoError(t, testutil.GatherAndCompare(reg, strings.NewReader(expectedMetrics)))
+		require.NoError(t, testutil.GatherAndCompare(reg, strings.NewReader(expectedMetrics)))
+	})
 
-			ctx := context.Background()
-			reg := prometheus.NewPedanticRegistry()
-			c, err := newCollector(ctx, func(context.Context) ([]byte, error) {
-				return data, nil
-			})
-			require.NoError(t, err)
-			reg.MustRegister(c)
+	t.Run("add additional snapshot", func(t *testing.T) {
+		callback = func(_ context.Context, args ...string) ([]byte, error) {
+			require.Contains(t, args, "pool-nvme/data")
+			return []byte("pool-nvme/data@migrate_v3	1700000000	4000000\n"), nil
+		}
+		// prepare data call
+		eventCh <- &zpoolEvent{
+			HistoryInternalName: "snapshot",
+			HistoryDSName:       "pool-nvme/data@migrate_v3",
+			Time:                time.Now(), // not really used
+		}
 
-			require.NoError(t, testutil.GatherAndCompare(reg, strings.NewReader(tc.expectedMetrics)))
-			require.NoError(t, testutil.GatherAndCompare(reg, strings.NewReader(tc.expectedMetrics)))
-		})
-	}
+		expectedMetrics := `
+# HELP zfs_snapshot_count Count of existing ZFS snapshots.
+# TYPE zfs_snapshot_count gauge
+zfs_snapshot_count{dataset="pool-hdd/backup/pull/node-a/data"} 2
+zfs_snapshot_count{dataset="pool-nvme/data"} 3
+# HELP zfs_snapshot_disk_used Disk space used by all snapshots.
+# TYPE zfs_snapshot_disk_used gauge
+zfs_snapshot_disk_used{dataset="pool-hdd/backup/pull/node-a/data"} 24772608
+zfs_snapshot_disk_used{dataset="pool-nvme/data"} 7571712
+# HELP zfs_snapshot_last_unixtime Time of last ZFS snapshot
+# TYPE zfs_snapshot_last_unixtime gauge
+zfs_snapshot_last_unixtime{dataset="pool-hdd/backup/pull/node-a/data"} 1667320886
+zfs_snapshot_last_unixtime{dataset="pool-nvme/data"} 1700000000
+			`
+		require.NoError(t, retryMax(t, 10, func() error {
+			return testutil.GatherAndCompare(reg, strings.NewReader(expectedMetrics))
+		}))
+	})
+
+	t.Run("delete snapshot", func(t *testing.T) {
+		callback = func(_ context.Context, args ...string) ([]byte, error) {
+			panic("should not be called")
+		}
+		// prepare data call
+		eventCh <- &zpoolEvent{
+			HistoryInternalName: "destroy",
+			HistoryDSName:       "pool-nvme/data@migrate_v1",
+			Time:                time.Now(), // not really used
+		}
+
+		expectedMetrics := `
+# HELP zfs_snapshot_count Count of existing ZFS snapshots.
+# TYPE zfs_snapshot_count gauge
+zfs_snapshot_count{dataset="pool-hdd/backup/pull/node-a/data"} 2
+zfs_snapshot_count{dataset="pool-nvme/data"} 3
+# HELP zfs_snapshot_disk_used Disk space used by all snapshots.
+# TYPE zfs_snapshot_disk_used gauge
+zfs_snapshot_disk_used{dataset="pool-hdd/backup/pull/node-a/data"} 24772608
+zfs_snapshot_disk_used{dataset="pool-nvme/data"} 7571712
+# HELP zfs_snapshot_last_unixtime Time of last ZFS snapshot
+# TYPE zfs_snapshot_last_unixtime gauge
+zfs_snapshot_last_unixtime{dataset="pool-hdd/backup/pull/node-a/data"} 1667320886
+zfs_snapshot_last_unixtime{dataset="pool-nvme/data"} 1700000000
+			`
+
+		require.NoError(t, retryMax(t, 10, func() error {
+			return testutil.GatherAndCompare(reg, strings.NewReader(expectedMetrics))
+		}))
+
+	})
 }
 
 func TestZpoolEvents(t *testing.T) {

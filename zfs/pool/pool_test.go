@@ -8,12 +8,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPoolMetrics(t *testing.T) {
 	reg := prometheus.NewPedanticRegistry()
-	c := NewCollector()
+	c := NewCollector(zerolog.Nop())
 	reg.MustRegister(c)
 
 	for _, tc := range []struct {
