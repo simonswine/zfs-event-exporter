@@ -100,18 +100,42 @@ func (s snapshotsState) parse(r io.Reader) error {
 		}
 
 		dataset := fields[0][:idx]
-
-		s[dataset] = append(s[dataset], snapshotState{
+		snapshot := snapshotState{
 			name: fields[0][idx+1:],
 			ts:   ts,
 			used: used,
-		})
-	}
+		}
 
-	for _, snapshots := range s {
-		sort.Slice(snapshots, func(i, j int) bool {
-			return snapshots[i].ts.Before(snapshots[j].ts)
+		// find position to insert
+		pos := sort.Search(len(s[dataset]), func(i int) bool {
+			return s[dataset][i].ts.UnixNano() >= snapshot.ts.UnixNano()
 		})
+
+		// check it is not a duplicate
+		for {
+
+			// end of slice
+			if pos >= len(s[dataset]) {
+				break
+			}
+
+			// check if ts still matches
+			if s[dataset][pos].ts.UnixNano() != ts.UnixNano() {
+				break
+			}
+
+			// duplicate of snapshot name
+			if s[dataset][pos].name == snapshot.name {
+				return nil
+			}
+
+			pos++
+		}
+
+		// insert at pos
+		s[dataset] = append(s[dataset], snapshotState{})
+		copy(s[dataset][pos+1:], s[dataset][pos:])
+		s[dataset][pos] = snapshot
 	}
 
 	return nil
