@@ -8,15 +8,18 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/simonswine/zfs-event-exporter/zfs/pool"
@@ -25,10 +28,6 @@ import (
 
 var (
 	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-
-	listenAddr     = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
-	logLevel       = flag.String("log-level", "info", "log level (debug, info, warn, error, fatal, panic)")
-	textFileOutput = flag.String("text-file-output", "", "path to write metrics to as text file")
 )
 
 type httpBuffer struct {
@@ -102,7 +101,7 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 			oldHash = hash
 		}
 
-		f, err := os.Create(*textFileOutput + ".$$")
+		f, err := os.Create(flags.textFileOutput + ".$$")
 		if err != nil {
 			return fmt.Errorf("error creating text file: %w", err)
 		}
@@ -115,10 +114,10 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 			return fmt.Errorf("error closing text file: %w", err)
 		}
 
-		if err := os.Rename(*textFileOutput+".$$", *textFileOutput); err != nil {
+		if err := os.Rename(flags.textFileOutput+".$$", flags.textFileOutput); err != nil {
 			return fmt.Errorf("error renaming text file: %w", err)
 		}
-		logger.Info().Msgf("wrote text file: %s", *textFileOutput)
+		logger.Info().Msgf("wrote text file: %s", flags.textFileOutput)
 
 		return nil
 	}
@@ -142,14 +141,82 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 	}, nil
 }
 
+var flags struct {
+	listenAddr           string
+	logLevel             string
+	textFileOutput       string
+	excludeSnapshotNames *cli.StringSlice
+}
+
 func main() {
+	app := &cli.App{
+		Name:   "zfs-event-exporter",
+		Usage:  "Prometheus metrics for pools and snapshots based on ZFS event history",
+		Action: run,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "listen-addr",
+				Value:       ":9128",
+				Usage:       "listen address for metrics http server",
+				Destination: &flags.listenAddr,
+			},
+			&cli.StringFlag{
+				Name:        "log-level",
+				Value:       "info",
+				Usage:       "log level for daemon",
+				Destination: &flags.logLevel,
+			},
+			&cli.StringFlag{
+				Name:        "text-file-output",
+				Value:       "",
+				Usage:       "file path for node-exporter text file",
+				Destination: &flags.textFileOutput,
+			},
+			&cli.StringSliceFlag{
+				Name:        "exclude-snapshot-name",
+				Usage:       "exclude snapshots matching regular expression",
+				Destination: flags.excludeSnapshotNames,
+			},
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(c *cli.Context) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewBuildInfoCollector())
 
-	collectorSnapshot, err := snapshot.NewCollector(ctx, logger)
+	keep := func(_, _ string) bool {
+		return true
+	}
+
+	if flags.excludeSnapshotNames != nil {
+		var match []*regexp.Regexp
+		for _, exclude := range flags.excludeSnapshotNames.Value() {
+			r, err := regexp.Compile(exclude)
+			if err != nil {
+				return fmt.Errorf("error compiling exclude regular expression: %w", err)
+			}
+			match = append(match, r)
+		}
+
+		keep = func(dataset, snapshot string) bool {
+			for _, r := range match {
+				if r.MatchString(dataset + "@" + snapshot) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+
+	collectorSnapshot, err := snapshot.NewCollector(ctx, logger, keep)
 	if err != nil {
 		logger.Fatal().Msgf("error creating collector: %v", err)
 	}
@@ -160,7 +227,7 @@ func main() {
 	flag.Parse()
 
 	// setting log level appropriately
-	lvl, err := zerolog.ParseLevel(*logLevel)
+	lvl, err := zerolog.ParseLevel(flags.logLevel)
 	if err != nil {
 		logger.Fatal().Msgf("invalid log level: %v", err)
 	}
@@ -168,7 +235,7 @@ func main() {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	srv := &http.Server{Addr: *listenAddr}
+	srv := &http.Server{Addr: flags.listenAddr}
 	mux := http.NewServeMux()
 	srv.Handler = mux
 
@@ -190,7 +257,7 @@ func main() {
 		}
 	}()
 
-	if *textFileOutput != "" {
+	if flags.textFileOutput != "" {
 		// create separate registry for text file output
 		regTextFile := prometheus.NewRegistry()
 		regTextFile.MustRegister(collectorSnapshot)
@@ -216,6 +283,8 @@ func main() {
 	g.Go(srv.ListenAndServe)
 
 	if err := g.Wait(); err != nil {
-		logger.Fatal().Msgf("error running: %v", err)
+		return fmt.Errorf("error running: %w", err)
 	}
+
+	return nil
 }

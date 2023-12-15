@@ -47,7 +47,7 @@ func TestPoolMetrics(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		c, err := newCollector(ctx, zerolog.Nop(), func(ctx context.Context, args ...string) ([]byte, error) { return callback(ctx, args...) }, eventCh)
+		c, err := newCollector(ctx, zerolog.Nop(), func(ctx context.Context, args ...string) ([]byte, error) { return callback(ctx, args...) }, eventCh, func(_, _ string) bool { return true })
 		require.NoError(t, err)
 		reg.MustRegister(c)
 

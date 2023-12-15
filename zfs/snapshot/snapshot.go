@@ -46,13 +46,16 @@ type snapshotCollector struct {
 
 	datasets      snapshotsState
 	listSnapshots func(context.Context, ...string) ([]byte, error)
+	keep          func(string, string) bool
 
 	metricCount        *prometheus.GaugeVec
 	metricLastUnixtime *prometheus.GaugeVec
 	metricDiskUsed     *prometheus.GaugeVec
 }
 
-func NewCollector(ctx context.Context, logger zerolog.Logger) (*snapshotCollector, error) {
+func keepAll(dataset, snapshot string) bool { return true }
+
+func NewCollector(ctx context.Context, logger zerolog.Logger, keep func(dataset string, snapshot string) bool) (*snapshotCollector, error) {
 	var (
 		eventCh                  = make(chan *zpoolEvent)
 		eventReader, eventWriter = io.Pipe()
@@ -68,7 +71,11 @@ func NewCollector(ctx context.Context, logger zerolog.Logger) (*snapshotCollecto
 		}
 	}()
 
-	return newCollector(ctx, logger, cmdListSnapshots, eventCh)
+	if keep != nil {
+		keep = keepAll
+	}
+
+	return newCollector(ctx, logger, cmdListSnapshots, eventCh, keep)
 
 }
 
@@ -141,7 +148,7 @@ func (s snapshotsState) parse(r io.Reader) error {
 	return nil
 }
 
-func newCollector(ctx context.Context, logger zerolog.Logger, listSnapshots func(context.Context, ...string) ([]byte, error), eventCh chan *zpoolEvent) (*snapshotCollector, error) {
+func newCollector(ctx context.Context, logger zerolog.Logger, listSnapshots func(context.Context, ...string) ([]byte, error), eventCh chan *zpoolEvent, keep func(string, string) bool) (*snapshotCollector, error) {
 	data, err := listSnapshots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
@@ -175,6 +182,7 @@ func newCollector(ctx context.Context, logger zerolog.Logger, listSnapshots func
 			Name:      "last_unixtime",
 			Help:      "Time of last ZFS snapshot",
 		}, []string{"dataset"}),
+		keep: keep,
 	}
 
 	go func() {
@@ -266,18 +274,23 @@ func (c *snapshotCollector) Collect(ch chan<- prometheus.Metric) {
 	c.metricLastUnixtime.Reset()
 
 	var (
-		used uint64
-		last time.Time
+		used, count uint64
+		last        time.Time
 	)
 
 	for dataset, snapshots := range c.datasets {
-		c.metricCount.WithLabelValues(dataset).Set(float64(len(snapshots)))
 		used = 0
+		count = 0
 		last = time.Time{}
 		for _, snap := range snapshots {
+			if !c.keep(dataset, snap.name) {
+				continue
+			}
+			count += 1
 			used += snap.used
 			last = snap.ts
 		}
+		c.metricCount.WithLabelValues(dataset).Set(float64(count))
 		c.metricDiskUsed.WithLabelValues(dataset).Set(float64(used))
 		c.metricLastUnixtime.WithLabelValues(dataset).Set(float64(last.Unix()))
 	}
