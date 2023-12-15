@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"flag"
 	"fmt"
 	"hash"
 	"io"
@@ -223,8 +222,6 @@ func run(c *cli.Context) error {
 	collectorPool := pool.NewCollector(logger)
 	reg.MustRegister(collectorSnapshot)
 	reg.MustRegister(collectorPool)
-
-	flag.Parse()
 
 	// setting log level appropriately
 	lvl, err := zerolog.ParseLevel(flags.logLevel)
