@@ -71,10 +71,6 @@ func NewCollector(ctx context.Context, logger zerolog.Logger, keep func(dataset 
 		}
 	}()
 
-	if keep != nil {
-		keep = keepAll
-	}
-
 	return newCollector(ctx, logger, cmdListSnapshots, eventCh, keep)
 
 }
@@ -152,6 +148,10 @@ func newCollector(ctx context.Context, logger zerolog.Logger, listSnapshots func
 	data, err := listSnapshots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
+	}
+
+	if keep == nil {
+		keep = keepAll
 	}
 
 	datasets := make(snapshotsState)
@@ -289,6 +289,9 @@ func (c *snapshotCollector) Collect(ch chan<- prometheus.Metric) {
 			count += 1
 			used += snap.used
 			last = snap.ts
+		}
+		if count == 0 {
+			continue
 		}
 		c.metricCount.WithLabelValues(dataset).Set(float64(count))
 		c.metricDiskUsed.WithLabelValues(dataset).Set(float64(used))

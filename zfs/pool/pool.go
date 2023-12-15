@@ -290,10 +290,6 @@ func (pc *poolCollector) Collect(ch chan<- prometheus.Metric) {
 		disk.Errors.setErrors(pc.metricDiskErrors, disk.Name, disk.Pool)
 	}
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	pc.metricStatus.Collect(ch)
 	pc.metricErrors.Collect(ch)
 	pc.metricDiskStatus.Collect(ch)

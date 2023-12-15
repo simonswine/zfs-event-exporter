@@ -75,7 +75,7 @@ func (b *httpBuffer) Reset() {
 	}
 }
 
-func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error) {
+func runTextFileOutput(ctx context.Context, handler http.Handler, filename string) (func(), error) {
 	var (
 		ticker  = time.NewTicker(15 * time.Second)
 		buffer  = newHTTPBuffer()
@@ -100,7 +100,7 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 			oldHash = hash
 		}
 
-		f, err := os.Create(flags.textFileOutput + ".$$")
+		f, err := os.Create(filename + ".$$")
 		if err != nil {
 			return fmt.Errorf("error creating text file: %w", err)
 		}
@@ -113,10 +113,10 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 			return fmt.Errorf("error closing text file: %w", err)
 		}
 
-		if err := os.Rename(flags.textFileOutput+".$$", flags.textFileOutput); err != nil {
+		if err := os.Rename(filename+".$$", filename); err != nil {
 			return fmt.Errorf("error renaming text file: %w", err)
 		}
-		logger.Info().Msgf("wrote text file: %s", flags.textFileOutput)
+		logger.Info().Msgf("wrote text file: %s", filename)
 
 		return nil
 	}
@@ -140,13 +140,6 @@ func runTextFileOutput(ctx context.Context, handler http.Handler) (func(), error
 	}, nil
 }
 
-var flags struct {
-	listenAddr           string
-	logLevel             string
-	textFileOutput       string
-	excludeSnapshotNames *cli.StringSlice
-}
-
 func main() {
 	app := &cli.App{
 		Name:   "zfs-event-exporter",
@@ -154,27 +147,23 @@ func main() {
 		Action: run,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "listen-addr",
-				Value:       ":9128",
-				Usage:       "listen address for metrics http server",
-				Destination: &flags.listenAddr,
+				Name:  "listen-addr",
+				Value: ":9128",
+				Usage: "listen address for metrics http server",
 			},
 			&cli.StringFlag{
-				Name:        "log-level",
-				Value:       "info",
-				Usage:       "log level for daemon",
-				Destination: &flags.logLevel,
+				Name:  "log-level",
+				Value: "info",
+				Usage: "log level for daemon",
 			},
 			&cli.StringFlag{
-				Name:        "text-file-output",
-				Value:       "",
-				Usage:       "file path for node-exporter text file",
-				Destination: &flags.textFileOutput,
+				Name:  "text-file-output",
+				Value: "",
+				Usage: "file path for node-exporter text file",
 			},
 			&cli.StringSliceFlag{
-				Name:        "exclude-snapshot-name",
-				Usage:       "exclude snapshots matching regular expression",
-				Destination: flags.excludeSnapshotNames,
+				Name:  "exclude-snapshot-name",
+				Usage: "exclude snapshots matching regular expression",
 			},
 		},
 	}
@@ -195,9 +184,9 @@ func run(c *cli.Context) error {
 		return true
 	}
 
-	if flags.excludeSnapshotNames != nil {
+	if excludes := c.StringSlice("exclude-snapshot-name"); len(excludes) > 0 {
 		var match []*regexp.Regexp
-		for _, exclude := range flags.excludeSnapshotNames.Value() {
+		for _, exclude := range excludes {
 			r, err := regexp.Compile(exclude)
 			if err != nil {
 				return fmt.Errorf("error compiling exclude regular expression: %w", err)
@@ -224,7 +213,7 @@ func run(c *cli.Context) error {
 	reg.MustRegister(collectorPool)
 
 	// setting log level appropriately
-	lvl, err := zerolog.ParseLevel(flags.logLevel)
+	lvl, err := zerolog.ParseLevel(c.String("log-level"))
 	if err != nil {
 		logger.Fatal().Msgf("invalid log level: %v", err)
 	}
@@ -232,7 +221,7 @@ func run(c *cli.Context) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	srv := &http.Server{Addr: flags.listenAddr}
+	srv := &http.Server{Addr: c.String("listen-addr")}
 	mux := http.NewServeMux()
 	srv.Handler = mux
 
@@ -254,7 +243,7 @@ func run(c *cli.Context) error {
 		}
 	}()
 
-	if flags.textFileOutput != "" {
+	if filename := c.String("text-file-output"); filename != "" {
 		// create separate registry for text file output
 		regTextFile := prometheus.NewRegistry()
 		regTextFile.MustRegister(collectorSnapshot)
@@ -267,7 +256,7 @@ func run(c *cli.Context) error {
 			},
 		)
 
-		f, err := runTextFileOutput(ctx, metricsHandler)
+		f, err := runTextFileOutput(ctx, metricsHandler, filename)
 		if err != nil {
 			logger.Fatal().Msgf("error running text file output: %v", err)
 		}
